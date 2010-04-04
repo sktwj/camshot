@@ -10,6 +10,15 @@
  *      3 of the License, or (at your option) any later version.
  */
 
+/*
+TODO-Important:
+ - add mmap support
+
+TODO
+ - add png support
+ - add jpg support
+*/
+
 #include <stdio.h>
 #include <unistd.h>
 #include <getopt.h>
