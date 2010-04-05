@@ -20,6 +20,8 @@
 
 #define DEFAULT_VIDEO_DEV "/dev/video0"
 #define DEFAULT_OUTDIR "/tmp/"
+#define DEFAULT_WIDTH 320
+#define DEFAULT_HEIGHT 240
 
 #define STR_FORMAT_LEN 4
 

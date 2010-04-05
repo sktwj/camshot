@@ -62,6 +62,8 @@ int process_arguments(int argc, char **argv)
 	strncpy(str_formats[FORMAT_RGB], "rgb", STR_FORMAT_LEN);
 	strncpy(str_formats[FORMAT_BMP], "bmp", STR_FORMAT_LEN);
 	strncpy(str_formats[FORMAT_RAW], "raw", STR_FORMAT_LEN);
+    req_width = DEFAULT_WIDTH;
+    req_height = DEFAULT_HEIGHT;
 
 	while( !processing_done )
 	{
