@@ -103,8 +103,7 @@ int main(int argc, char **argv)
 	streaming_on();
 
     /* let the camera self adjust by 'ignoring' 200 complete buffer queues */
-    if( b_verbose )
-        printf("Letting the camera automaticaly adjust the picture:");
+    printf("Letting the camera automaticaly adjust the picture:");
     
     for(i=0; i<AUTO_ADJUST_TURNS; i++)
     {
@@ -116,15 +115,11 @@ int main(int argc, char **argv)
                 queue_buffer(ready_buf);
         }
 
-        if( b_verbose )
-        {
-            printf(".");
-            fflush(stdout);
-        }
+        printf(".");
+        fflush(stdout);
     }
 
-    if( b_verbose )
-        printf("Done.\n");
+    printf("Done.\n");
 
     pthread_create(&capture_thread, NULL, &capture_func, NULL);
 
