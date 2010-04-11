@@ -59,3 +59,5 @@ clean:
 	rm -f $(CORE_BIN)
 	rm -f $(BASE_DIR)*.o
 
+install:
+	cp -f $(CORE_BIN) /usr/bin/
