@@ -26,6 +26,7 @@ TODO
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <linux/videodev2.h>
 #include <pthread.h>
 #include <sys/time.h>
@@ -40,6 +41,7 @@ pthread_mutex_t cond_mutex    = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t  condition     = PTHREAD_COND_INITIALIZER;
 
 void *capture_func( void *ptr);
+void exit_program(int sig);
 
 int main(int argc, char **argv)
 {
@@ -87,6 +89,8 @@ int main(int argc, char **argv)
             printf("Using named pipe %s\n", psz_named_pipe);
         }
 	}
+
+    (void)signal(SIGINT, exit_program);
 
     if( b_named_pipe )
     {
@@ -143,13 +147,18 @@ int main(int argc, char **argv)
 
     while( in_str[0] != 'q' )
     {
-        printf("Command (h for help): ");
-        fflush(stdout);
-
-        if( fgets(in_str, 16, stdin) == NULL )
+        if( !b_named_pipe )
         {
-            printf("Got NULL! Try again.\n");
-            continue;
+            printf("Command (h for help): ");
+            fflush(stdout);
+
+            if( fgets(in_str, 16, stdin) == NULL )
+            {
+                printf("Got NULL! Try again.\n");
+                continue;
+            }
+        } else {
+            in_str[0] = 'x';
         }
         
 
@@ -183,6 +192,19 @@ int main(int argc, char **argv)
 	if( b_verbose ) printf("Device closed.\n");
 
 	return 0;
+}
+
+void exit_program(int sig)
+{
+    printf("Caught CTRL+C, camshot ending\n");
+
+    /* Clean up */
+	streaming_off();
+	unmap_buffers();
+	close(camera_fd);
+	if( b_verbose ) printf("Device closed.\n");
+
+    exit(EXIT_SUCCESS);
 }
 
 void *capture_func(void *ptr)
