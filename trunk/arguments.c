@@ -19,8 +19,10 @@
 
 char psz_video_dev[MAX_LEN_VIDEO_DEV];
 char psz_output_dir[MAX_LEN_OUTDIR];
+char psz_named_pipe[MAX_LEN_NAMEDPIPE];
 int b_verbose = 0,
-    b_printinfo = 0;
+    b_printinfo = 0,
+    b_named_pipe = 0;
 
 uint32_t req_width, 
          req_height;
@@ -40,6 +42,7 @@ static void print_help(int argc, char **argv)
     printf("\t--info\t\t-i\tPrints info about the video device and stops.\n");
     printf("\t--width num\t-W num\tSets the desired width (if the camera supports it)\n");
     printf("\t--height num\t-H num\tSets the desired height (if the camera supports it)\n");
+    printf("\t--pipe file\t-p file\tUses named pipe file as output for images\n");
 
 	printf("Image formats (fmt):\n");
 /*	printf("\tpng - png compressed image (default)\n"); */
@@ -77,10 +80,11 @@ int process_arguments(int argc, char **argv)
             {"info", no_argument, NULL, 'i'},
             {"width", required_argument, NULL, 'W'},
             {"height", required_argument, NULL, 'H'},
+            {"pipe", required_argument, NULL, 'p'},
 			{0,0,0,0}
 		};
 
-		int current_opt = getopt_long(argc, argv, "hd:o:vf:iW:H:", opts, NULL);
+		int current_opt = getopt_long(argc, argv, "hd:o:vf:iW:H:p:", opts, NULL);
 
 		switch(current_opt)
 		{
@@ -113,6 +117,10 @@ int process_arguments(int argc, char **argv)
                 break;
             case 'H':
                 req_height = atoi(optarg);
+                break;
+            case 'p':
+                strncpy(psz_named_pipe, optarg, MAX_LEN_NAMEDPIPE);
+                b_named_pipe = 1;
                 break;
 			case '?':
 				print_help(argc, argv);

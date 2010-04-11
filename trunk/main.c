@@ -29,6 +29,7 @@ TODO
 #include <linux/videodev2.h>
 #include <pthread.h>
 #include <sys/time.h>
+#include <errno.h>
 
 #include "arguments.h"
 #include "camera.h"
@@ -52,7 +53,9 @@ int main(int argc, char **argv)
     /* open the camera device */
 	if( (camera_fd = open(psz_video_dev, O_RDWR)) < 0 )
 	{
-		perror("open()");
+        char error_buf[256];
+        sprintf(error_buf, "open() %s", psz_video_dev);
+		perror(error_buf);
 		exit(-1);
 	}
 
@@ -79,7 +82,22 @@ int main(int argc, char **argv)
 		printf("Image format:\t\t%s\n",str_formats[e_outfmt]);
 		printf("\n");
 		printf("Opening device %s\n", psz_video_dev);
+        if( b_named_pipe )
+        {
+            printf("Using named pipe %s\n", psz_named_pipe);
+        }
 	}
+
+    if( b_named_pipe )
+    {
+        int ret_val = mkfifo(psz_named_pipe, 0666);
+
+        if ((ret_val == -1) && (errno != EEXIST)) {
+            perror("Error creating the named pipe");
+            exit(EXIT_FAILURE);
+        }
+        
+    }
 
     if( req_width && req_height )
     {
@@ -158,41 +176,6 @@ int main(int argc, char **argv)
         }
     }
 
-
-    /* this is the actual capture/store block - will go to a separate thread */
-    /*unsigned char *rgb_buffer = (unsigned char *)malloc(req_width*req_height*3);
-	for(int i=0; i<total_buffers; i++)
-	{
-        // get the idx of ready buffer
-        queue_buffer(i);
-		int ready_buf = dequeue_buffer();
-
-        if( b_verbose )
-        {
-            printf("Buffer %d ready. Length: %uB\n", ready_buf, image_buffers[i].length);
-        }
-
-        // convert data to rgb
-        if( convert_yuv_to_rgb_buffer((unsigned char *)(image_buffers[i].start), 
-                                      rgb_buffer, req_width, req_height) == 0 )
-        {
-            if( b_verbose )
-            {
-                printf("\tConverted to rgb.\n");
-            }
-        }
-
-        // create the file name
-        char cur_name[64];
-        sprintf(cur_name, "%simage_%d.bmp", psz_output_dir, i);
-
-        // make the bmp image
-        make_bmp(rgb_buffer, 
-                 cur_name, 
-                 req_width, 
-                 req_height);
-	}*/
-
 	/* Clean up */
 	streaming_off();
 	unmap_buffers();
@@ -241,19 +224,21 @@ void *capture_func(void *ptr)
 
         /* make the image */
 
+        /* create the file name */
+        if( !b_named_pipe )
+            sprintf(cur_name, "%scamshot_%lu.bmp", psz_output_dir, timestamp.tv_sec);
+        else
+            sprintf(cur_name, "%s", psz_named_pipe);
+
         switch( e_outfmt )
         {
             case FORMAT_BMP:
-                /* create the file name */
-                sprintf(cur_name, "%scamshot_%lu.bmp", psz_output_dir, timestamp.tv_sec);
                 make_bmp(rgb_buffer, 
                          cur_name, 
                          req_width, 
                          req_height);
                 break;
             case FORMAT_RGB:
-                /* create the file name */
-                sprintf(cur_name, "%scamshot_%lu.rgb", psz_output_dir, timestamp.tv_sec);
                 make_rgb(rgb_buffer, 
                          cur_name, 
                          req_width, 

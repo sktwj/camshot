@@ -17,6 +17,7 @@
 
 #define MAX_LEN_VIDEO_DEV 128
 #define MAX_LEN_OUTDIR 2048
+#define MAX_LEN_NAMEDPIPE 2048
 
 #define DEFAULT_VIDEO_DEV "/dev/video0"
 #define DEFAULT_OUTDIR "/tmp/"
@@ -39,8 +40,10 @@ extern char str_formats[FORMAT_LAST][STR_FORMAT_LEN];
 
 extern char psz_video_dev[MAX_LEN_VIDEO_DEV];
 extern char psz_output_dir[MAX_LEN_OUTDIR];
+extern char psz_named_pipe[MAX_LEN_NAMEDPIPE];
 extern int b_verbose,
-           b_printinfo;
+           b_printinfo,
+           b_named_pipe;
 
 extern uint32_t req_width, 
                 req_height;
