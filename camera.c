@@ -172,11 +172,37 @@ void get_format(void)
     }
 }
 
+int check_pixelformat(void)
+{
+    switch(camera_format.fmt.pix.pixelformat)
+    {
+        case V4L2_PIX_FMT_YUYV:
+            return V4L2_PIX_FMT_YUYV;
+        default:
+            return -1;
+    }
+
+    return -1;
+}
+
+void print_pixelformat(FILE *fd)
+{
+    switch( check_pixelformat() )
+    {
+        case V4L2_PIX_FMT_YUYV:
+            fprintf(fd,"YUYV");
+            break;
+        default:
+            fprintf(fd,"Unsupported pixelformat! Please do write to the mailing list!");
+            break;
+    }
+}
+
 void print_format(void)
 {
     printf("\tWidth: %u\n", camera_format.fmt.pix.width);
     printf("\tHeight: %u\n", camera_format.fmt.pix.height);
-    printf("\tPixel format: 0x%x\n", camera_format.fmt.pix.pixelformat);
+    printf("\tPixel format: "); print_pixelformat(stdout); printf("\n");
     printf("\tBytes per line: %u\n", camera_format.fmt.pix.bytesperline);
 }
 

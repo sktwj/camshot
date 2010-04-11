@@ -232,14 +232,23 @@ void *capture_func(void *ptr)
             printf("Buffer %d ready. Length: %uB\n", ready_buf, image_buffers[0].length);
         }
 
-        /* convert data to rgb */
-        if( convert_yuv_to_rgb_buffer((unsigned char *)(image_buffers[0].start), 
-                                      rgb_buffer, req_width, req_height) == 0 )
+        switch( check_pixelformat() )
         {
-            if( b_verbose )
-            {
-                printf("\tConverted to rgb.\n");
-            }
+            case V4L2_PIX_FMT_YUYV:
+                /* convert data to rgb */
+                if( convert_yuv_to_rgb_buffer((unsigned char *)(image_buffers[0].start), 
+                                              rgb_buffer, req_width, req_height) == 0 )
+                {
+                    if( b_verbose )
+                    {
+                        printf("\tConverted to rgb.\n");
+                    }
+                }
+                break;
+            default:
+                print_pixelformat(stderr);
+                fprintf(stderr,"\n");
+                return NULL;
         }
 
         timestamp = query_buffer(0);

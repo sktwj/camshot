@@ -60,6 +60,12 @@ extern void print_caps(void);
 /* Gets the camera format data */
 extern void get_format(void);
 
+/* Checks the pixelformat -1 if unsupported. */
+extern int check_pixelformat(void);
+
+/* Prints the pixelformat */
+extern void print_pixelformat(FILE *fd);
+
 /* Sets the capture width & height */
 extern int set_width_height(uint32_t w, uint32_t h);
 
