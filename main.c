@@ -119,7 +119,7 @@ int main(int argc, char **argv)
         req_height = camera_format.fmt.pix.height;
     }
 
-	total_buffers = req_mmap_buffers(5);
+	total_buffers = req_mmap_buffers(2);
 
 	/* start the capture */
 	streaming_on();
@@ -221,11 +221,13 @@ void *capture_func(void *ptr)
         pthread_cond_wait(&condition, &cond_mutex);
         pthread_mutex_unlock(&cond_mutex);
 
-        /* queue one buffer */
+        /* queue one buffer and 'refresh it' */
         queue_buffer(0);
+        queue_buffer(1);
 
         /* get the idx of ready buffer */
 		ready_buf = dequeue_buffer();
+        ready_buf = dequeue_buffer();
 
         if( b_verbose )
         {
