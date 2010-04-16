@@ -43,7 +43,10 @@ extern char psz_output_dir[MAX_LEN_OUTDIR];
 extern char psz_named_pipe[MAX_LEN_NAMEDPIPE];
 extern int b_verbose,
            b_printinfo,
-           b_named_pipe;
+           b_named_pipe,
+           b_shared_mem;
+
+extern int shared_mem_key;
 
 extern uint32_t req_width, 
                 req_height;

@@ -32,6 +32,7 @@ CORE_SRC = \
 	$(BASE_DIR)arguments.c \
 	$(BASE_DIR)camera.c \
     $(BASE_DIR)image.c \
+    $(BASE_DIR)shmem.c \
 
 
 CORE_BIN = camshot 
