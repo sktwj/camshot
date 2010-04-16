@@ -22,7 +22,10 @@ char psz_output_dir[MAX_LEN_OUTDIR];
 char psz_named_pipe[MAX_LEN_NAMEDPIPE];
 int b_verbose = 0,
     b_printinfo = 0,
-    b_named_pipe = 0;
+    b_named_pipe = 0,
+    b_shared_mem = 0;
+
+int shared_mem_key;
 
 uint32_t req_width, 
          req_height;
@@ -34,7 +37,7 @@ static void print_help(int argc, char **argv)
 {
 	printf("\n\t\t%s - Linux console webcam screenshot utility\n\n", argv[0]);
 	printf("Usage: %s [OPTIONS]\n", argv[0]);
-	printf("Options:\n");
+	printf("\nOptions:\n");
 	printf("\t--help\t\t-h\tPrints this help.\n");
 	printf("\t--device dev\t-d dev\tWorks with the dev device (default /dev/video0)\n");
 	printf("\t--outdir dir\t-o dir\tSaves all output in dir (default /tmp)\n");
@@ -43,12 +46,15 @@ static void print_help(int argc, char **argv)
     printf("\t--width num\t-W num\tSets the desired width (if the camera supports it)\n");
     printf("\t--height num\t-H num\tSets the desired height (if the camera supports it)\n");
     printf("\t--pipe file\t-p file\tUses named pipe file as output for images\n");
+    printf("\t--shm id\t-s id\tUses shared memory as output for images. See below for more info\n");
 
-	printf("Image formats (fmt):\n");
+	printf("\nImage formats (fmt):\n");
 /*	printf("\tpng - png compressed image (default)\n"); */
 	printf("\trgb - raw rqb binary file\n");
 	printf("\tbmp - bmp image (default)\n");
-	printf("Author:\n");
+    printf("\nOption --shm id / -s id:\n");
+    printf("\tIf you choose this option camshot will store the images from the camera to a region of memory which it will share with a key id so a users process can use this region for its input. The writes to this region are protected  by a semaphore with the same key as the memory region. It is important that the user process uses this semaphore while reading the buffer!\n");
+	printf("\nAuthor:\n");
 	printf("\tThis software was written by Gabriel Zabusek (gabriel.zabusek@gmail.com)\n");
 }
 
@@ -81,10 +87,11 @@ int process_arguments(int argc, char **argv)
             {"width", required_argument, NULL, 'W'},
             {"height", required_argument, NULL, 'H'},
             {"pipe", required_argument, NULL, 'p'},
+            {"shm", required_argument, NULL, 's'},
 			{0,0,0,0}
 		};
 
-		int current_opt = getopt_long(argc, argv, "hd:o:vf:iW:H:p:", opts, NULL);
+		int current_opt = getopt_long(argc, argv, "hd:o:vf:iW:H:p:s:", opts, NULL);
 
 		switch(current_opt)
 		{
@@ -121,6 +128,10 @@ int process_arguments(int argc, char **argv)
             case 'p':
                 strncpy(psz_named_pipe, optarg, MAX_LEN_NAMEDPIPE);
                 b_named_pipe = 1;
+                break;
+            case 's':
+                shared_mem_key = atoi(optarg);
+                b_shared_mem = 1;
                 break;
 			case '?':
 				print_help(argc, argv);

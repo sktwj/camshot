@@ -19,11 +19,17 @@ TODO
  - add jpg support
 */
 
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE
+#endif
+
 #include <stdio.h>
 #include <unistd.h>
 #include <getopt.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -35,18 +41,26 @@ TODO
 #include "arguments.h"
 #include "camera.h"
 #include "image.h"
+#include "shmem.h"
 
 pthread_mutex_t capture_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t cond_mutex    = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t  condition     = PTHREAD_COND_INITIALIZER;
 
+uint8_t *p_shm;
+int     shm_sem;
+
+int total_buffers;
+int stream_finish = 0;
+pthread_t capture_thread, stream_thread;
+
 void *capture_func( void *ptr);
+void *stream_func(void *ptr);
 void exit_program(int sig);
 
 int main(int argc, char **argv)
 {
-	int total_buffers;
-    pthread_t capture_thread;
+    int shmid;
     int i,j;
     char in_str[16];
 
@@ -66,15 +80,6 @@ int main(int argc, char **argv)
 
 	if( b_verbose ) printf("Device opened.\n");
 
-    if( b_printinfo )
-    {
-        printf("Device info:\n");
-        print_caps();
-        print_format();
-        close(camera_fd);
-        exit(EXIT_SUCCESS);    
-    }
-
 	if( b_verbose )
 	{
 		printf("Video device:\t\t%s\n", psz_video_dev);
@@ -88,9 +93,26 @@ int main(int argc, char **argv)
         {
             printf("Using named pipe %s\n", psz_named_pipe);
         }
+        if( b_shared_mem )
+            printf("Using shared memory. key = %i\n", shared_mem_key);
 	}
 
+    if( b_printinfo )
+    {
+        printf("Device info:\n");
+        print_caps();
+        print_format();
+        close(camera_fd);
+        exit(EXIT_SUCCESS);    
+    }
+
     (void)signal(SIGINT, exit_program);
+
+    if( b_shared_mem && b_named_pipe )
+    {
+        printf("WARNING: shared memory and named pipe can't be used together (yet - work in progress. Defaulting to named pipe.\n");
+        b_shared_mem = 0;
+    }
 
     if( b_named_pipe )
     {
@@ -119,6 +141,26 @@ int main(int argc, char **argv)
         req_height = camera_format.fmt.pix.height;
     }
 
+    if( b_shared_mem )
+    {
+        if((shmid = shmget(shared_mem_key, req_width*req_height*3, IPC_CREAT | 0666)) < 0) {
+            perror("Error getting shared memory id");
+            exit(EXIT_FAILURE);
+        }
+
+        if((p_shm = (uint8_t *)shmat(shmid, NULL, 0)) == (void *) -1) {
+            perror("Error getting shared memory ptr");
+            exit(EXIT_FAILURE);
+        }       
+
+        shm_sem = semget((key_t)shared_mem_key, 1, IPC_CREAT | 0666);
+
+        sem_set(&shm_sem);
+
+        if( b_verbose )
+            printf("Shared memory ID: %i\nSemaphore ID: %i\n", shmid, shm_sem);
+    }
+
 	total_buffers = req_mmap_buffers(2);
 
 	/* start the capture */
@@ -143,24 +185,30 @@ int main(int argc, char **argv)
 
     printf("Done.\n");
 
-    pthread_create(&capture_thread, NULL, &capture_func, NULL);
+    if( b_shared_mem || b_named_pipe )
+    {
+        pthread_create(&stream_thread, NULL, &stream_func, NULL);
+        while(1)
+        {
+            pthread_join(stream_thread, NULL);
+        }
+    }
+    else
+    {
+        pthread_create(&capture_thread, NULL, &capture_func, NULL);
+    }
 
     while( in_str[0] != 'q' )
     {
-        if( !b_named_pipe )
-        {
-            printf("Command (h for help): ");
-            fflush(stdout);
-
-            if( fgets(in_str, 16, stdin) == NULL )
-            {
-                printf("Got NULL! Try again.\n");
-                continue;
-            }
-        } else {
-            in_str[0] = 'x';
-        }
         
+        printf("Command (h for help): ");
+        fflush(stdout);
+
+        if( fgets(in_str, 16, stdin) == NULL )
+        {
+            printf("Got NULL! Try again.\n");
+            continue;
+        }
 
         switch(in_str[0])
         {
@@ -186,33 +234,50 @@ int main(int argc, char **argv)
     }
 
 	/* Clean up */
-	streaming_off();
-	unmap_buffers();
-	close(camera_fd);
-	if( b_verbose ) printf("Device closed.\n");
-
+    exit_program(SIGINT);
 	return 0;
 }
 
 void exit_program(int sig)
 {
-    printf("Caught CTRL+C, camshot ending\n");
+    printf("\tcamshot ending\n");
 
     /* Clean up */
+    if( b_shared_mem || b_named_pipe )
+    {
+        stream_finish = 1;
+        pthread_join(stream_thread, NULL);
+    }
+
 	streaming_off();
-	unmap_buffers();
+    unmap_buffers();
 	close(camera_fd);
 	if( b_verbose ) printf("Device closed.\n");
+    if( b_shared_mem )
+    {
+        shmdt(p_shm);
+        sem_del(&shm_sem);
+    }
 
     exit(EXIT_SUCCESS);
 }
 
 void *capture_func(void *ptr)
 {
-    unsigned char *rgb_buffer = (unsigned char *)malloc(req_width*req_height*3);
+    unsigned char *rgb_buffer;
     int ready_buf;
     char cur_name[64];
+    int i;
     struct timeval timestamp;
+
+    if( b_shared_mem )
+    {
+        rgb_buffer = p_shm;
+    }
+    else
+    {
+        rgb_buffer = (unsigned char *)malloc(req_width*req_height*3);
+    }
 
     for(;;)
     {
@@ -222,24 +287,31 @@ void *capture_func(void *ptr)
         pthread_mutex_unlock(&cond_mutex);
 
         /* queue one buffer and 'refresh it' */
-        queue_buffer(0);
-        queue_buffer(1);
+        /* @todo Change 2 to some #define */
+        for(i=0; i<2; i++)
+        {
+            queue_buffer(i);
+        }
+        for(i=0; i<2 - 1; i++)
+        {
+            dequeue_buffer();
+        }
 
         /* get the idx of ready buffer */
 		ready_buf = dequeue_buffer();
-        ready_buf = dequeue_buffer();
 
         if( b_verbose )
         {
-            printf("Buffer %d ready. Length: %uB\n", ready_buf, image_buffers[0].length);
+            printf("Buffer %d ready. Length: %uB\n", ready_buf, image_buffers[ready_buf].length);
         }
 
         switch( check_pixelformat() )
         {
             case V4L2_PIX_FMT_YUYV:
                 /* convert data to rgb */
-                if( convert_yuv_to_rgb_buffer((unsigned char *)(image_buffers[0].start), 
-                                              rgb_buffer, req_width, req_height) == 0 )
+                if( convert_yuv_to_rgb_buffer(
+                                    (unsigned char *)(image_buffers[ready_buf].start), 
+                                    rgb_buffer, req_width, req_height) == 0 )
                 {
                     if( b_verbose )
                     {
@@ -286,4 +358,105 @@ void *capture_func(void *ptr)
     return NULL;
 }
 
+void *stream_func(void *ptr)
+{
+    unsigned char *rgb_buffer;
+    int ready_buf;
+    char cur_name[64];
+    int i;
+
+    if( b_shared_mem )
+    {
+        rgb_buffer = p_shm;
+    }
+    else
+    {
+        rgb_buffer = (unsigned char *)malloc(req_width*req_height*3);
+    }
+
+    for(i=0; i<total_buffers; i++)
+    {
+        queue_buffer(i);
+    }
+
+    for(;;)
+    {
+        /* get the idx of ready buffer */
+        for(i=0; i<total_buffers; i++)
+        {
+            /* Check if the thread should stop. */
+            if( stream_finish ) return NULL;
+
+		    ready_buf = dequeue_buffer();
+
+            if( b_verbose )
+            {
+                printf("Buffer %d ready. Length: %uB\n", ready_buf, image_buffers[ready_buf].length);
+            }
+
+            switch( check_pixelformat() )
+            {
+                case V4L2_PIX_FMT_YUYV:
+                    /* convert data to rgb */
+                    if( b_shared_mem )
+                        sem_down(&shm_sem);
+                    if( convert_yuv_to_rgb_buffer(
+                                        (unsigned char *)(image_buffers[ready_buf].start), 
+                                        rgb_buffer, req_width, req_height) == 0 )
+                    {
+                        if( b_verbose )
+                        {
+                            printf("\tConverted to rgb.\n");
+                        }
+                    }
+                    if( b_shared_mem )
+                        sem_up(&shm_sem);
+                    break;
+                default:
+                    print_pixelformat(stderr);
+                    fprintf(stderr,"\n");
+                    return NULL;
+            }
+
+            /* make the image */
+
+            /* create the file name */
+            if( b_named_pipe )
+                sprintf(cur_name, "%s", psz_named_pipe);
+
+            switch( e_outfmt )
+            {
+                case FORMAT_BMP:
+                    if( b_shared_mem )
+                    {
+                        printf("Unsupported!\n");
+                        break;
+                    }
+                    make_bmp(rgb_buffer, 
+                             cur_name, 
+                             req_width, 
+                             req_height);
+                    break;
+                case FORMAT_RGB:
+                    if( b_shared_mem )
+                    {
+                        /* The buffer is already rgb :) */
+                        break;
+                    }
+                    make_rgb(rgb_buffer, 
+                             cur_name, 
+                             req_width, 
+                             req_height);
+                    break;
+                default:
+                    fprintf(stderr, "Not supported format requested!\n");
+                    break;
+            }   
+            
+            queue_buffer(ready_buf);
+        }        
+    }
+
+    return NULL;
+}
 
