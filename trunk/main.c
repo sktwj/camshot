@@ -110,7 +110,7 @@ int main(int argc, char **argv)
 
     if( b_shared_mem && b_named_pipe )
     {
-        printf("WARNING: shared memory and named pipe can't be used together (yet - work in progress. Defaulting to named pipe.\n");
+        printf("WARNING: shared memory and named pipe can't be used together. Use more instances of camshot. Defaulting to named pipe.\n");
         b_shared_mem = 0;
     }
 

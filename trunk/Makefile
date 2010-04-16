@@ -34,13 +34,23 @@ CORE_SRC = \
     $(BASE_DIR)image.c \
     $(BASE_DIR)shmem.c \
 
+SHM_TEST_SRC = \
+	$(BASE_DIR)shmem_test.c \
+	$(BASE_DIR)shmem.c \
+	$(BASE_DIR)image.c \
+	$(BASE_DIR)arguments.c \
+
 
 CORE_BIN = camshot 
+SHM_TEST_BIN = shmem_test
 
 #objects
 CORE_OBJ := $(addsuffix .o,$(basename $(CORE_SRC)))
+SHM_TEST_OBJ := $(addsuffix .o,$(basename $(SHM_TEST_SRC)))
 
 all: $(CORE_BIN)
+
+shm_test: $(SHM_TEST_BIN)
 
 %.o: %.c
 	@echo "Compiling $<"
@@ -55,6 +65,11 @@ $(CORE_BIN): $(CORE_OBJ)
 	@echo
 	@echo "Linking final binary $(CORE_BIN)"
 	@$(CC) $(CFLAGS) -o $@ $(CORE_OBJ)
+
+$(SHM_TEST_BIN): $(SHM_TEST_OBJ)
+	@echo
+	@echo "Linking final binary $(SHM_TEST_BIN)"
+	@$(CC) $(CFLAGS) -o $@ $(SHM_TEST_OBJ)
 
 clean:
 	rm -f $(CORE_BIN)
