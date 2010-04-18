@@ -50,13 +50,11 @@ int main(int argc, char **argv)
     }       
 
     shm_sem = semget((key_t)shared_mem_key, 1, 0666);
-
     sem_set(&shm_sem);
 
     sem_down(&shm_sem);
-
-    make_bmp(p_shm,"./test_shm.bmp",atoi(argv[2]),atoi(argv[3]));
-
+        make_bmp(p_shm,"./test_shm.bmp",atoi(argv[2]),atoi(argv[3]));
     sem_up(&shm_sem);
+
     return 0;
 }
