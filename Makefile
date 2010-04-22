@@ -6,10 +6,12 @@
 # Author: Bc. Gabriel Zabusek		25.11.2008
 
 #compiler definitions
-CC  = gcc
-CXX = g++
-AS  = as
-LD  = ld
+CROSS_COMPILE = 
+
+CC  = $(CROSS_COMPILE)gcc
+CXX = $(CROSS_COMPILE)g++
+AS  = $(CROSS_COMPILE)as
+LD  = $(CROSS_COMPILE)ld
 
 BASE_DIR = ./
 
